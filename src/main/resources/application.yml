@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: oracle-nl-sql-agent
+
+  # ── Oracle DataSource ────────────────────────────────────────────────────────
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1521/XEPDB1
+    username: user
+    password: password
+    driver-class-name: oracle.jdbc.OracleDriver
+
+    # Connection pool (HikariCP)
+    hikari:
+      pool-name: OracleNlSqlPool
+      maximum-pool-size: 10        # Max connections
+      minimum-idle: 2              # Min idle connections
+      connection-timeout: 30000    # 30 seconds
+      idle-timeout: 600000         # 10 minutes
+      max-lifetime: 1800000        # 30 minutes
+      connection-test-query: SELECT 1 FROM DUAL
+
+  # Disable Spring Security auto-config (UI only — no auth needed locally)
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+
+# ── Anthropic Claude ──────────────────────────────────────────────────────────
+anthropic:
+  api-key: ${ANTHROPIC_API_KEY}
+
+# ── Server ────────────────────────────────────────────────────────────────────
+server:
+  port: 8081
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+logging:
+  level:
+    com.divakarchowdary.nlsql: INFO
+    org.springframework.jdbc: WARN
+  pattern:
+    console: "%d{HH:mm:ss} [%level] %logger{25}: %msg%n"

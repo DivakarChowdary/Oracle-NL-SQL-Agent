@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Oracle NL-to-SQL Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0F1117;
+    --surface:  #1A1F2E;
+    --surface2: #242938;
+    --border:   #2E3348;
+    --accent:   #C74634;
+    --accent2:  #E05545;
+    --gold:     #F0A500;
+    --text:     #E8EAF0;
+    --muted:    #6B7594;
+    --green:    #4CAF82;
+    --mono:     'JetBrains Mono', monospace;
+    --sans:     'Inter', system-ui, sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+  .logo-icon {
+    width: 28px;
+    height: 28px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+  }
+  .logo span { color: var(--muted); font-weight: 400; }
+  .header-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+    margin-right: 5px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  #table-select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+  }
+  #table-select:focus { border-color: var(--accent); }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* ── LEFT PANE — CHAT ── */
+  .chat-pane {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    min-height: 0;
+  }
+  .pane-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scroll-behavior: smooth;
+  }
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* messages */
+  .msg { display: flex; flex-direction: column; gap: 4px; max-width: 88%; }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.agent { align-self: flex-start; align-items: flex-start; }
+  .msg-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .06em; }
+  .msg-bubble {
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .msg.user .msg-bubble {
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.agent .msg-bubble {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .msg-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .rows-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    color: var(--green);
+  }
+  .error-bubble {
+    background: rgba(199,70,52,.12);
+    border: 1px solid rgba(199,70,52,.3);
+    color: #ff8a80;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: var(--mono);
+  }
+
+  /* typing indicator */
+  .typing {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+  }
+  .typing span {
+    width: 6px; height: 6px;
+    background: var(--muted);
+    border-radius: 50%;
+    animation: bounce .9s ease-in-out infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: .15s; }
+  .typing span:nth-child(3) { animation-delay: .3s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+
+  /* input area */
+  .input-area {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-shrink: 0;
+  }
+  #question-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    resize: none;
+    outline: none;
+    min-height: 42px;
+    max-height: 120px;
+    line-height: 1.5;
+    transition: border-color .2s;
+  }
+  #question-input:focus { border-color: var(--accent); }
+  #question-input::placeholder { color: var(--muted); }
+  #send-btn {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background .2s, transform .15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  #send-btn:hover { background: var(--accent2); transform: translateY(-1px); }
+  #send-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+  /* ── RIGHT PANE — SQL + RESULTS ── */
+  .result-pane {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .result-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .tab {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: color .2s, border-color .2s;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .tab-content { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .tab-content.active { display: flex; }
+
+  /* SQL panel */
+  #sql-panel {
+    flex: 1;
+    overflow: auto;
+    padding: 20px;
+    background: var(--bg);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    position: relative;
+  }
+  .sql-placeholder {
+    color: var(--muted);
+    font-style: italic;
+    font-family: var(--sans);
+    padding: 40px 0;
+    text-align: center;
+    font-size: 14px;
+  }
+  .sql-copy-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: color .2s, border-color .2s;
+  }
+  .sql-copy-btn:hover { color: var(--text); border-color: var(--muted); }
+
+  /* SQL syntax highlight */
+  .kw { color: #C792EA; font-weight: 700; }
+  .fn { color: #82AAFF; }
+  .str { color: #C3E88D; }
+  .num { color: #F78C6C; }
+  .cmt { color: var(--muted); font-style: italic; }
+  .tbl { color: var(--gold); }
+  .col { color: #89DDFF; }
+
+  /* Results panel */
+  #results-panel {
+    flex: 1;
+    overflow: auto;
+    background: var(--bg);
+  }
+  .results-placeholder {
+    color: var(--muted);
+    font-style: italic;
+    font-family: var(--sans);
+    padding: 40px;
+    text-align: center;
+    font-size: 14px;
+  }
+  .results-meta {
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .results-meta strong { color: var(--green); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  thead { position: sticky; top: 0; background: var(--surface2); z-index: 2; }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: .06em;
+    font-size: 11px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(46,51,72,.6);
+    color: var(--text);
+    white-space: nowrap;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .null-val { color: var(--muted); font-style: italic; }
+
+  /* schema sidebar toggle */
+  .schema-hint {
+    padding: 12px 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .schema-hint a {
+    color: var(--accent2);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  /* example questions */
+  .examples {
+    padding: 16px 20px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .example-chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 11px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color .2s, border-color .2s;
+    background: var(--surface);
+  }
+  .example-chip:hover { color: var(--text); border-color: var(--muted); }
+
+  @media (max-width: 768px) {
+    .main { grid-template-columns: 1fr; }
+    .result-pane { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    Oracle NL-to-SQL Agent
+    <span>/ ask in plain English</span>
+  </div>
+  <div class="header-meta">
+    <span id="conn-status"><span class="status-dot"></span>Connecting…</span>
+    <select id="table-select" title="Target table (optional)">
+      <option value="">Auto-detect table</option>
+    </select>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- LEFT: CHAT -->
+  <div class="chat-pane">
+    <div class="pane-label">Conversation</div>
+    <div class="messages" id="messages">
+      <div class="msg agent">
+        <div class="msg-label">AGENT</div>
+        <div class="msg-bubble">
+          👋 Ask me anything about your Oracle database in plain English.<br><br>
+          For example: <em>"How many new records were inserted into GLOBAL_PATIENTS this week?"</em>
+          or <em>"Show me the top 10 rows from EMPLOYEES ordered by hire date."</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="examples" id="examples">
+      <div class="example-chip" onclick="setQuestion(this)">How many rows are in GLOBAL_PATIENTS?</div>
+      <div class="example-chip" onclick="setQuestion(this)">Show me the latest 10 records</div>
+      <div class="example-chip" onclick="setQuestion(this)">Count records inserted today</div>
+      <div class="example-chip" onclick="setQuestion(this)">Show distinct values in STATUS column</div>
+    </div>
+
+    <div class="input-area">
+      <textarea id="question-input"
+                placeholder="Ask a question about your data…"
+                rows="1"
+                onkeydown="handleKey(event)"></textarea>
+      <button id="send-btn" onclick="sendQuestion()">Ask →</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: SQL + RESULTS -->
+  <div class="result-pane">
+    <div class="result-tabs">
+      <div class="tab active" onclick="switchTab('sql', this)">Generated SQL</div>
+      <div class="tab" onclick="switchTab('results', this)">Results</div>
+    </div>
+
+    <div id="sql-tab" class="tab-content active">
+      <div id="sql-panel">
+        <div class="sql-placeholder">Generated SQL will appear here after your first question.</div>
+      </div>
+    </div>
+
+    <div id="results-tab" class="tab-content">
+      <div id="results-panel">
+        <div class="results-placeholder">Query results will appear here.</div>
+      </div>
+    </div>
+
+    <div class="schema-hint">
+      Schema loaded for: <span id="schema-table">—</span> &nbsp;·&nbsp;
+      <a onclick="loadSchema()">View schema details</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8081/api';
+
+// ── Init ────────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch(`${API}/health`);
+    if (res.ok) {
+      document.getElementById('conn-status').innerHTML =
+        '<span class="status-dot"></span>Connected';
+    } else {
+      setDisconnected();
+    }
+  } catch { setDisconnected(); }
+
+  try {
+    const tables = await fetch(`${API}/tables`).then(r => r.json());
+    const sel = document.getElementById('table-select');
+    tables.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      sel.appendChild(opt);
+    });
+  } catch (e) { console.warn('Could not load tables:', e); }
+}
+
+function setDisconnected() {
+  const el = document.getElementById('conn-status');
+  el.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#C74634;margin-right:5px;"></span>Not connected';
+  el.style.color = '#ff8a80';
+}
+
+// ── Send question ────────────────────────────────────────────────────────────
+async function sendQuestion() {
+  const input = document.getElementById('question-input');
+  const question = input.value.trim();
+  if (!question) return;
+
+  const tableName = document.getElementById('table-select').value;
+
+  appendMessage('user', question);
+  input.value = '';
+  autoResize(input);
+
+  const typing = appendTyping();
+  setLoading(true);
+
+  try {
+    const res = await fetch(`${API}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, tableName: tableName || null })
+    });
+    const data = await res.json();
+    typing.remove();
+    setLoading(false);
+
+    if (data.success) {
+      const msg = `Query returned **${data.rowCount}** row${data.rowCount !== 1 ? 's' : ''} in ${data.executionTimeMs}ms.`;
+      appendMessage('agent', msg, data.rowCount, data.executionTimeMs);
+      displaySql(data.generatedSql);
+      displayResults(data.results, data.rowCount, data.executionTimeMs);
+      if (tableName || data.generatedSql) {
+        document.getElementById('schema-table').textContent = tableName || '(auto-detected)';
+      }
+      switchTab('results', document.querySelectorAll('.tab')[1]);
+    } else {
+      appendError(data.error || 'An unknown error occurred.');
+      if (data.generatedSql) displaySql(data.generatedSql);
+    }
+  } catch (e) {
+    typing.remove();
+    setLoading(false);
+    appendError('Could not reach the server. Is the Spring Boot app running on port 8081?');
+  }
+}
+
+// ── UI helpers ───────────────────────────────────────────────────────────────
+function appendMessage(role, text, rows, ms) {
+  const container = document.getElementById('messages');
+  const msg = document.createElement('div');
+  msg.className = `msg ${role}`;
+
+  const label = document.createElement('div');
+  label.className = 'msg-label';
+  label.textContent = role === 'user' ? 'YOU' : 'AGENT';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  msg.appendChild(label);
+  msg.appendChild(bubble);
+
+  if (rows !== undefined) {
+    const meta = document.createElement('div');
+    meta.className = 'msg-meta';
+    meta.innerHTML = `<span class="rows-badge">${rows} rows</span> <span>${ms}ms</span>`;
+    msg.appendChild(meta);
+  }
+
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendError(text) {
+  const container = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg agent';
+  wrap.innerHTML = `<div class="msg-label">AGENT</div><div class="error-bubble">⚠ ${escapeHtml(text)}</div>`;
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+}
+
+function appendTyping() {
+  const container = document.getElementById('messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg agent';
+  wrap.innerHTML = `<div class="msg-label">AGENT</div>
+    <div class="typing"><span></span><span></span><span></span></div>`;
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+  return wrap;
+}
+
+function setLoading(on) {
+  document.getElementById('send-btn').disabled = on;
+  document.getElementById('question-input').disabled = on;
+}
+
+// ── SQL display with syntax highlighting ─────────────────────────────────────
+function displaySql(sql) {
+  const panel = document.getElementById('sql-panel');
+
+  const keywords = ['SELECT','FROM','WHERE','AND','OR','NOT','IN','IS','NULL',
+    'ORDER','BY','GROUP','HAVING','JOIN','LEFT','RIGHT','INNER','OUTER','ON',
+    'AS','DISTINCT','TOP','LIMIT','FETCH','NEXT','ROWS','ONLY','UNION','ALL',
+    'INSERT','UPDATE','DELETE','WITH','CASE','WHEN','THEN','ELSE','END',
+    'BETWEEN','LIKE','EXISTS','COUNT','SUM','AVG','MIN','MAX','TRUNC',
+    'TO_DATE','SYSDATE','NVL','COALESCE','ROWNUM','CONNECT','BY','START'];
+
+  let highlighted = escapeHtml(sql);
+
+  // Highlight keywords
+  keywords.forEach(kw => {
+    highlighted = highlighted.replace(
+      new RegExp(`\\b${kw}\\b`, 'gi'),
+      `<span class="kw">${kw}</span>`);
+  });
+
+  // Numbers
+  highlighted = highlighted.replace(/\b(\d+)\b/g, '<span class="num">$1</span>');
+
+  // Strings
+  highlighted = highlighted.replace(/'([^']*)'/g, "<span class=\"str\">'$1'</span>");
+
+  panel.innerHTML = `
+    <button class="sql-copy-btn" onclick="copySql()">Copy</button>
+    <pre style="white-space:pre-wrap;word-break:break-word">${highlighted}</pre>
+  `;
+  panel._raw = sql;
+}
+
+function copySql() {
+  const panel = document.getElementById('sql-panel');
+  if (panel._raw) {
+    navigator.clipboard.writeText(panel._raw);
+    const btn = panel.querySelector('.sql-copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  }
+}
+
+// ── Results table ─────────────────────────────────────────────────────────────
+function displayResults(results, rowCount, ms) {
+  const panel = document.getElementById('results-panel');
+  if (!results || results.length === 0) {
+    panel.innerHTML = '<div class="results-placeholder">Query executed successfully but returned no rows.</div>';
+    return;
+  }
+
+  const cols = Object.keys(results[0]);
+
+  let html = `
+    <div class="results-meta">
+      <strong>${rowCount} rows</strong>
+      <span>${ms}ms execution</span>
+      <span>${cols.length} columns</span>
+    </div>
+    <table>
+      <thead><tr>${cols.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>
+      <tbody>
+  `;
+
+  results.forEach(row => {
+    html += '<tr>' + cols.map(c => {
+      const v = row[c];
+      return v === null || v === undefined
+        ? '<td><span class="null-val">NULL</span></td>'
+        : `<td title="${escapeHtml(String(v))}">${escapeHtml(String(v))}</td>`;
+    }).join('') + '</tr>';
+  });
+
+  html += '</tbody></table>';
+  panel.innerHTML = html;
+}
+
+// ── Schema viewer ─────────────────────────────────────────────────────────────
+async function loadSchema() {
+  const table = document.getElementById('table-select').value;
+  if (!table) { alert('Select a table first.'); return; }
+  const data = await fetch(`${API}/schema/${table}`).then(r => r.json());
+  alert(JSON.stringify(data, null, 2)); // simple — can be enhanced
+}
+
+// ── Tab switcher ─────────────────────────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById(`${name}-tab`).classList.add('active');
+}
+
+// ── Misc ─────────────────────────────────────────────────────────────────────
+function setQuestion(el) {
+  document.getElementById('question-input').value = el.textContent;
+  document.getElementById('question-input').focus();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendQuestion();
+  }
+  autoResize(e.target);
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+init();
+</script>
+</body>
+</html>
